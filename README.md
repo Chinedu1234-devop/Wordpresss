@@ -1,4 +1,4 @@
-# 🚀 WordPress Deployment on AWS using Terraform
+#  WordPress Deployment on AWS using Terraform
 
 This project demonstrates how to deploy a **WordPress website on AWS** using **Terraform**, with an EC2 instance hosting the application and an RDS MySQL database as the backend.
 
