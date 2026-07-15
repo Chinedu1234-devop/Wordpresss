@@ -1,3 +1,18 @@
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region
 }
@@ -12,6 +27,22 @@ data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
+  }
+}
+
+# Find a valid Amazon Linux 2 AMI for the selected region
+data "aws_ami" "amazon_linux_2" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
   }
 }
 
@@ -65,23 +96,33 @@ resource "aws_security_group" "rds_sg" {
 
 # RDS Instance
 resource "aws_db_instance" "wordpress_db" {
-  allocated_storage    = 20
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro"
-  db_name              = "wordpress"
-  username             = var.db_username
-  password             = var.db_password
-  publicly_accessible  = false
-  skip_final_snapshot  = true
+  allocated_storage      = 20
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = "db.t3.micro"
+  db_name                = "wordpress"
+  username               = var.db_username
+  password               = var.db_password
+  publicly_accessible    = false
+  skip_final_snapshot    = true
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
+}
+
+resource "tls_private_key" "wordpress" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "wordpress" {
+  key_name   = var.key_name
+  public_key = tls_private_key.wordpress.public_key_openssh
 }
 
 # EC2 Instance
 resource "aws_instance" "wordpress" {
-  ami           = "ami-087c9ba923d9765d8"
+  ami           = data.aws_ami.amazon_linux_2.id
   instance_type = "t2.micro"
-  key_name      = var.key_name
+  key_name      = aws_key_pair.wordpress.key_name
 
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
 
